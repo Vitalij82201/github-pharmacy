@@ -7,10 +7,14 @@ import org.hstn.pharmacy.security.dto.AuthResponse;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
 import java.util.Base64;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -19,70 +23,61 @@ public class AuthService {
 
     private final JwtTokenProvider tokenProvider;
     private final AuthenticationManager authenticationManager;
+    private final CustomUserDetailsService userDetailsService;
 
-    // Метод для аутентификации по DTO запросу
     public AuthResponse authenticate(AuthRequest request) {
-
-        return authenticateUser(request.getUserName(), request.getPassword());
-
+        log.debug("Authenticating user: {}", request.getEmail());
+        return authenticateUser(request.getEmail(), request.getPassword());
     }
 
-
-    // Метод для аутентификации по Basic Auth
     public AuthResponse authenticateBasic(String authHeader) {
-
-        // Проверяем корректность заголовка Authorization
-
         if (authHeader == null || !authHeader.startsWith("Basic ")) {
             throw new IllegalArgumentException("Invalid Basic authentication token");
         }
-        // Декодируем и парсим заголовок
+
         String[] credentials = decodingBasicAuth(authHeader);
-
         return authenticateUser(credentials[0], credentials[1]);
-
     }
 
     private String[] decodingBasicAuth(String authHeader) {
-
-
-        // "Basic dHJVJGUncvjgJVJ=="
         String base64Credentials = authHeader.substring("Basic ".length()).trim();
         byte[] credDecoded = Base64.getDecoder().decode(base64Credentials);
         String credentials = new String(credDecoded);
-        // Username:..... password:.....
         String[] values = credentials.split(":", 2);
 
         if (values.length != 2) {
             throw new IllegalArgumentException("Invalid Basic authentication token");
-
         }
-
         return values;
-
     }
 
     private AuthResponse authenticateUser(String username, String password) {
-
-        log.info("Authenticate user: " + username);
+        log.info("Authenticating user: {}", username);
 
         try {
+            // 1. Аутентифікація
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(username, password)
             );
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
-            log.info("Запрос на создание jwt от " + username + ", " + password);
+            // 2. Отримання ролей у правильному форматі
+            UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
-            String jwt = tokenProvider.createToken(authentication.getName());
+            List<String> roles = userDetails.getAuthorities().stream()
+                    .map(GrantedAuthority::getAuthority)
+                    .collect(Collectors.toList());
+
+            log.debug("User roles: {}", roles);
+
+            // 3. Генерація токена
+            String jwt = tokenProvider.createToken(username, roles);
 
             return new AuthResponse(jwt);
         } catch (Exception e) {
-            log.error("Authentication failed for user: " + username, e);
+            log.error("Authentication failed for user: {}", username, e);
             throw e;
         }
-
-
     }
 }

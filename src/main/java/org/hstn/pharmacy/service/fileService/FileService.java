@@ -17,17 +17,19 @@ import java.util.UUID;
 @Slf4j
 public class FileService {
 
+    private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
     private final Path fileStorageLocation = Paths.get("src/main/resources/static/upload").toAbsolutePath().normalize();
 
     public boolean uploadFile(MultipartFile file) {
+        if (file.getSize() > MAX_FILE_SIZE) {
+            throw new RestException(HttpStatus.PAYLOAD_TOO_LARGE, "Розмір файлу перевищує максимально допустимий: " + MAX_FILE_SIZE + " байт");
+        }
         try {
             String originalFilename = file.getOriginalFilename();
 
             String extension = "";
             if (originalFilename != null) {
-
-                extension = originalFilename.substring(originalFilename.lastIndexOf(". ") + 1);
-
+                extension = originalFilename.substring(originalFilename.lastIndexOf(".") + 1);
             } else {
                 throw new IllegalArgumentException("Null original file name");
             }
@@ -40,7 +42,8 @@ public class FileService {
             Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
 
         } catch (IOException e) {
-            throw new RestException(HttpStatus.SERVICE_UNAVAILABLE, "Mistake" + file);
+            log.error("File upload error: {}", e.getMessage(), e);
+            throw new RestException(HttpStatus.SERVICE_UNAVAILABLE, "Помилка збереження файлу: " + file.getOriginalFilename());
         }
         return true;
     }

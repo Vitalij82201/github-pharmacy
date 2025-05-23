@@ -19,7 +19,7 @@ public class AuthController implements AuthApi {
 
     @Override
     public ResponseEntity<AuthResponse> authenticate(AuthRequest request) {
-        log.info("Attempting to authenticate user: " + request.getUserName());
+        log.info("Attempting to authenticate user: " + request.getEmail());
 
         return ResponseEntity.ok(authService.authenticate(request));
     }

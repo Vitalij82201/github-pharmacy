@@ -2,7 +2,7 @@ package org.hstn.pharmacy.security.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.hstn.pharmacy.repository.repositoryUser.UserRepository;
+import org.hstn.pharmacy.repository.user.UserRepository;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -17,11 +17,10 @@ public class CustomUserDetailsService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
-        log.info("Loading user by username: " + email);
+        log.info("Loading user by username: {}", email); // Використання плейсхолдера для логування
 
         return userRepository.findByEmail(email)
                 .map(UserToUserDetails::new)
-                .orElseThrow(() -> new UsernameNotFoundException("manager with email " + email + " not found"));
-
+                .orElseThrow(() -> new UsernameNotFoundException("User with email " + email + " not found")); // Змінено "manager" на "User"
     }
 }

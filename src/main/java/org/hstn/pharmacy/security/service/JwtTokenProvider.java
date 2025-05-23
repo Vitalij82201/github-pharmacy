@@ -1,61 +1,91 @@
 package org.hstn.pharmacy.security.service;
 
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.JwtException;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
-import org.hstn.pharmacy.exceptions.InvalidJwtException;
+import io.jsonwebtoken.*;
+import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.stereotype.Component;
 
-import javax.crypto.spec.SecretKeySpec;
-import java.security.Key;
+import javax.crypto.SecretKey;
 import java.util.Date;
+import java.util.List;
+import java.util.stream.Collectors;
 
-@Service
+@Component
+@Slf4j
 public class JwtTokenProvider {
 
     @Value("${jwt.secret}")
-    private String jwtSecret;
+    private String secret;
 
     @Value("${jwt.lifetime}")
-    private long jwtLifeTime;
+    private long validityInMilliseconds;
 
-    private Key getSigningKey() {
-        return new SecretKeySpec(jwtSecret.getBytes(), SignatureAlgorithm.HS256.getJcaName());
+    private SecretKey key;
+
+    private final CustomUserDetailsService customUserDetailsService;
+
+    public JwtTokenProvider(CustomUserDetailsService customUserDetailsService) {
+        this.customUserDetailsService = customUserDetailsService;
     }
 
-    public String createToken(String username) {
+    @PostConstruct
+    protected void init() {
+        this.key = Keys.hmacShaKeyFor(secret.getBytes());
+    }
+
+    public String createToken(String username, List<String> roles) {
+        Claims claims = Jwts.claims().setSubject(username);
+        // Зберігаємо ролі БЕЗ префікса ROLE_ в токені
+        List<String> simpleRoles = roles.stream()
+                .map(role -> role.startsWith("ROLE_") ? role : "ROLE_" + role)
+                .collect(Collectors.toList());
+        claims.put("roles", simpleRoles);
+
         Date now = new Date();
-        Date expiryDate = new Date(now.getTime() + jwtLifeTime);
+        Date validity = new Date(now.getTime() + validityInMilliseconds);
 
         return Jwts.builder()
-                .setSubject(username)
+                .setClaims(claims)
                 .setIssuedAt(now)
-                .setExpiration(expiryDate)
-                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+                .setExpiration(validity)
+                .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
     }
 
-    private Claims parseToken(String token) {
-        try {
-            return Jwts.parserBuilder()
-                    .setSigningKey(getSigningKey())
-                    .build()
-                    .parseClaimsJws(token)
-                    .getBody();
-        } catch (JwtException e) {
-            throw new InvalidJwtException("Invalid JWT token: " + e.getMessage());
-        }
-    }
-
-    public boolean validateToken(String token) {
-        // Просто парсим токен, если не выбросит исключение, значит валиден
-        parseToken(token);
-        return true;
+    public Authentication getAuthentication(String token) {
+        String username = getUserNameFromJWT(token);
+        UserDetails userDetails = customUserDetailsService.loadUserByUsername(username);
+        return new UsernamePasswordAuthenticationToken(userDetails, "", userDetails.getAuthorities());
     }
 
     public String getUserNameFromJWT(String token) {
-        return parseToken(token).getSubject();
+        return Jwts.parserBuilder().setSigningKey(key).build()
+                .parseClaimsJws(token)
+                .getBody()
+                .getSubject();
+    }
+
+    public boolean validateToken(String token) {
+        try {
+            Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token);
+            return true;
+        } catch (JwtException | IllegalArgumentException e) {
+            log.warn("JWT validation failed: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    public String resolveToken(HttpServletRequest request) {
+        String bearer = request.getHeader("Authorization");
+        if (bearer != null && bearer.startsWith("Bearer ")) {
+            return bearer.substring(7);
+        }
+        return null;
     }
 }

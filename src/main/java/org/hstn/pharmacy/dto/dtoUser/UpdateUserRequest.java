@@ -1,6 +1,5 @@
 package org.hstn.pharmacy.dto.dtoUser;
 
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -12,7 +11,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class UpdateUserRequest {
-    @NotBlank
+    @NotNull
     private Integer id;
 
     @NotNull
@@ -26,4 +25,7 @@ public class UpdateUserRequest {
 
     @Size(min = 3, max = 25)
     private String lastName;
+
+    @Size(min = 3, max = 100)
+    private String email;
 }

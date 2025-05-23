@@ -4,8 +4,9 @@ import lombok.RequiredArgsConstructor;
 import org.hstn.pharmacy.entity.entityUser.ConfirmationCode;
 import org.hstn.pharmacy.entity.entityUser.User;
 import org.hstn.pharmacy.exceptions.NotFoundException;
-import org.hstn.pharmacy.repository.repositoryUser.ConfirmationCodeRepository;
+import org.hstn.pharmacy.repository.user.ConfirmationCodeRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -29,6 +30,10 @@ public class ConfirmationCodeService {
         confirmationCodeRepository.save(code);
 
         return newConfirmationCode;
+    }
+    @Transactional
+    public void deleteByUserId(Integer userId) {
+        confirmationCodeRepository.deleteByUserId(userId);
     }
 
     public ConfirmationCode findByCode(String code){

@@ -46,7 +46,7 @@ public class User {
     @Column(nullable = false, unique = true)
     private String email;
 
-    @Size(min = 8, max = 20)
+    @Size(min = 8, max = 30)
     private String password;
 
     @Enumerated(EnumType.STRING)
@@ -66,15 +66,13 @@ public class User {
     public final boolean equals(Object o) {
         if (this == o) return true;
         if (o == null) return false;
-        Class<?> oEffectiveClass = o instanceof HibernateProxy ? ((HibernateProxy) o).getHibernateLazyInitializer().getPersistentClass() : o.getClass();
-        Class<?> thisEffectiveClass = this instanceof HibernateProxy ? ((HibernateProxy) this).getHibernateLazyInitializer().getPersistentClass() : this.getClass();
-        if (thisEffectiveClass != oEffectiveClass) return false;
+        if (getClass() != o.getClass()) return false; // Use getClass() for comparison
         User user = (User) o;
         return getId() != null && Objects.equals(getId(), user.getId());
     }
 
     @Override
     public final int hashCode() {
-        return this instanceof HibernateProxy ? ((HibernateProxy) this).getHibernateLazyInitializer().getPersistentClass().hashCode() : getClass().hashCode();
+        return Objects.hash(getId());
     }
 }
